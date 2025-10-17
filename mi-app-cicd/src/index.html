@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Mi App CI/CD Profesional</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Pipeline CI/CD Profesional</h1>
+            <p>Desplegado automáticamente con GitHub Actions + ArgoCD</p>
+        </header>
+        
+        <div class="status-board">
+            <div class="status-item">
+                <h3>📦 Environment</h3>
+                <div id="environment" class="status-value">Loading...</div>
+            </div>
+            <div class="status-item">
+                <h3>🔄 Version</h3>
+                <div id="version" class="status-value">1.0.0</div>
+            </div>
+            <div class="status-item">
+                <h3>📊 Build</h3>
+                <div id="build-id" class="status-value">${BUILD_ID}</div>
+            </div>
+        </div>
+
+        <div class="pipeline-steps">
+            <h2>🔧 Pipeline Steps</h2>
+            <ol>
+                <li>✅ Code Commit</li>
+                <li>✅ CI: Build & Test</li>
+                <li>✅ Security Scan</li>
+                <li>✅ Push to Registry</li>
+                <li>✅ CD: Deploy to Dev</li>
+                <li>🔄 CD: Deploy to Prod (Manual Approval)</li>
+            </ol>
+        </div>
+
+        <footer>
+            <p>Last deployed: <span id="timestamp"></span></p>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
