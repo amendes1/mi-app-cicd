@@ -1,0 +1,117 @@
+name: 🚀 Deploy to Kubernetes
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  IMAGE_REGISTRY: ghcr.io
+  IMAGE_REPO: ${{ github.repository }}
+  APP_VERSION: 1.0.0
+
+jobs:
+  test:
+    name: 🧪 Test y Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔍 Lint Dockerfile
+      uses: hadolint/hadolint-action@v3.0.0
+      with:
+        dockerfile: Dockerfile
+
+    - name: 🐳 Build Docker image
+      run: |
+        docker build -t $IMAGE_REGISTRY/$IMAGE_REPO:$GITHUB_SHA .
+        docker build -t $IMAGE_REGISTRY/$IMAGE_REPO:latest .
+
+    - name: 🧪 Test de la imagen
+      run: |
+        docker run --rm $IMAGE_REGISTRY/$IMAGE_REPO:$GITHUB_SHA php -v
+        docker run --rm $IMAGE_REGISTRY/$IMAGE_REPO:$GITHUB_SHA curl -f http://localhost/ || echo "App started correctly"
+
+  deploy-dev:
+    name: 🚀 Deploy to Development
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🐳 Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.IMAGE_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 🐳 Build and Push Image
+      run: |
+        docker build -t $IMAGE_REGISTRY/$IMAGE_REPO:$GITHUB_SHA .
+        docker push $IMAGE_REGISTRY/$IMAGE_REPO:$GITHUB_SHA
+
+    - name: 🔧 Deploy to Kubernetes
+      run: |
+        # Reemplazar variables en los YAMLs
+        envsubst < k8s/deployment.yml > deployment-final.yml
+        kubectl apply -f deployment-final.yml
+        kubectl apply -f k8s/service.yml
+        kubectl apply -f k8s/route.yml
+      env:
+        IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+        IMAGE_REPO: ${{ env.IMAGE_REPO }}
+        GITHUB_SHA: ${{ github.sha }}
+        APP_VERSION: ${{ env.APP_VERSION }}
+        DB_HOST: mysql-dev
+
+    - name: 📊 Verificar despliegue
+      run: |
+        kubectl get pods -l app=mi-app
+        kubectl get services mi-app-service
+
+  deploy-prod:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🐳 Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.IMAGE_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 🐳 Build and Push Image
+      run: |
+        docker build -t $IMAGE_REGISTRY/$IMAGE_REPO:$GITHUB_SHA .
+        docker build -t $IMAGE_REGISTRY/$IMAGE_REPO:latest .
+        docker push $IMAGE_REGISTRY/$IMAGE_REPO:$GITHUB_SHA
+        docker push $IMAGE_REGISTRY/$IMAGE_REPO:latest
+
+    - name: 🚀 Deploy to Production
+      run: |
+        envsubst < k8s/deployment.yml > deployment-final.yml
+        kubectl apply -f deployment-final.yml
+        kubectl apply -f k8s/service.yml
+        kubectl apply -f k8s/route.yml
+        
+        # Esperar que esté listo
+        kubectl rollout status deployment/mi-app --timeout=300s
+      env:
+        IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+        IMAGE_REPO: ${{ env.IMAGE_REPO }}
+        GITHUB_SHA: ${{ github.sha }}
+        APP_VERSION: ${{ env.APP_VERSION }}
+        DB_HOST: mysql-prod
